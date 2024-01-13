@@ -1,0 +1,119 @@
+import java.util.HashMap;
+import java.util.Map;
+
+import spark.Request;
+import spark.Response;
+import static spark.Spark.*;
+
+public class TrainTicketSystem {
+    private static Map<String, User> users = new HashMap<>();
+    private static Map<String, String> seatMap = new HashMap<>();
+
+    public static void main(String[] args) {
+       
+        post("/purchaseTicket", TrainTicketSystem::purchaseTicket);
+
+        get("/receipt/:user", TrainTicketSystem::getReceipt);
+
+        get("/viewUsers/:section", TrainTicketSystem::viewUsersBySection);
+
+        delete("/removeUser/:user", TrainTicketSystem::removeUser);
+
+        put("/modifySeat/:user/:newSeat", TrainTicketSystem::modifySeat);
+    }
+
+    private static String purchaseTicket(Request request, Response response) {
+        String from = "London";
+        String to = "France";
+        double price = 20.0;
+
+        String firstName = request.queryParams("firstName");
+        String lastName = request.queryParams("lastName");
+        String email = request.queryParams("email");
+
+        User user = new User(firstName, lastName, email);
+        users.put(firstName + lastName, user);
+
+        String section = seatMap.size() % 2 == 0 ? "A" : "B";
+        String seat = section + (seatMap.size() / 2 + 1);
+        seatMap.put(firstName + lastName, seat);
+
+        String receipt = String.format("From: %s, To: %s, User: %s %s, Price: $%.2f", from, to, firstName, lastName, price);
+        return receipt;
+    }
+
+    private static String getReceipt(Request request, Response response) {
+        String userKey = request.params("user");
+        User user = users.get(userKey);
+        if (user != null) {
+            String seat = seatMap.get(userKey);
+            return String.format("User: %s %s, Email: %s, Seat: %s", user.getFirstName(), user.getLastName(), user.getEmail(), seat);
+        } else {
+            response.status(404);
+            return "User not found.";
+        }
+    }
+
+    private static String viewUsersBySection(Request request, Response response) {
+        String section = request.params("section");
+        StringBuilder result = new StringBuilder("Users in Section " + section + ":\n");
+
+        for (Map.Entry<String, String> entry : seatMap.entrySet()) {
+            if (entry.getValue().startsWith(section)) {
+                User user = users.get(entry.getKey());
+                result.append(String.format("%s %s - Seat: %s\n", user.getFirstName(), user.getLastName(), entry.getValue()));
+            }
+        }
+
+        return result.toString();
+    }
+
+    private static String removeUser(Request request, Response response) {
+        String userKey = request.params("user");
+        User removedUser = users.remove(userKey);
+        if (removedUser != null) {
+            seatMap.remove(userKey);
+            return "User removed: " + userKey;
+        } else {
+            response.status(404);
+            return "User not found.";
+        }
+    }
+
+    private static String modifySeat(Request request, Response response) {
+        String userKey = request.params("user");
+        String newSeat = request.params("newSeat");
+
+        if (seatMap.containsKey(userKey)) {
+            seatMap.put(userKey, newSeat);
+            return "Seat modified for " + userKey + ": " + newSeat;
+        } else {
+            response.status(404);
+            return "User not found.";
+        }
+    }
+
+    private static class User {
+        private String firstName;
+        private String lastName;
+        private String email;
+
+        public User(String firstName, String lastName, String email) {
+            this.firstName = firstName;
+            this.lastName = lastName;
+            this.email = email;
+        }
+
+        public String getFirstName() {
+            return firstName;
+        }
+
+        public String getLastName() {
+            return lastName;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+    }
+}
